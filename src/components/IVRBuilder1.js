@@ -1,0 +1,179 @@
+import React, { useCallback, useState } from "react";
+import ReactFlow, {
+  addEdge,
+  Background,
+  Controls,
+  MiniMap,
+  ReactFlowProvider,
+  useNodesState,
+  useEdgesState,
+  Handle,
+  Position,
+} from "reactflow";
+import "reactflow/dist/style.css";
+import { v4 as uuidv4 } from "uuid";
+import Button from "react-bootstrap/Button";
+import Modal from "react-bootstrap/Modal";
+import Form from "react-bootstrap/Form";
+
+const nodeTypes = {
+  ivrNode: ({ data }) => (
+    <div style={{ padding: 12, background: "#fff", border: "2px solid #555", borderRadius: 8, width: 180, position: 'relative' }}>
+      <Handle type="target" position={Position.Top} style={{ background: '#555' }} />
+      <strong style={{ display: "block", marginBottom: 6 }}>{data.label}</strong>
+      <div style={{ fontSize: 12, whiteSpace: "pre-wrap" }}>{data.details}</div>
+      <Handle type="source" position={Position.Bottom} style={{ background: '#555' }} />
+    </div>
+  ),
+};
+
+const IVRBuilder = () => {
+  const [nodes, setNodes, onNodesChange] = useNodesState([
+    {
+      id: "start",
+      type: "ivrNode",
+      position: { x: 100, y: 100 },
+      data: { label: "Start", details: "" },
+    },
+  ]);
+
+  const [edges, setEdges, onEdgesChange] = useEdgesState([]);
+  const [showModal, setShowModal] = useState(false);
+  const [selectedType, setSelectedType] = useState("prompt");
+  const [formData, setFormData] = useState({});
+  const [sourceNode, setSourceNode] = useState("start");
+  const [rfInstance, setRfInstance] = useState(null);
+
+  const openConfigModal = (type) => {
+    setSelectedType(type);
+    setFormData({});
+    setShowModal(true);
+  };
+
+  const handleSaveNode = () => {
+    const id = uuidv4();
+    const label = `${selectedType.charAt(0).toUpperCase() + selectedType.slice(1)} Node`;
+    const details =
+      selectedType === "prompt"
+        ? `Message: ${formData.message}`
+        : selectedType === "key"
+        ? `Options:\n${Object.entries(formData.options || {})
+            .map(([k, v]) => `${k}: ${v}`)
+            .join("\n")}`
+        : selectedType === "transfer"
+        ? `Transfer to: ${formData.destination}`
+        : "Ends call";
+
+    const position = { x: 100 + nodes.length * 200, y: 100 + nodes.length * 80 };
+
+    const newNode = {
+      id,
+      type: "ivrNode",
+      position,
+      data: { label, details },
+    };
+
+    const newEdge = { id: `${sourceNode}-${id}`, source: sourceNode, target: id, animated: true };
+
+    const updatedNodes = [...nodes, newNode];
+    const updatedEdges = addEdge(newEdge, edges);
+    setNodes(updatedNodes);
+    setEdges(updatedEdges);
+
+    // Call fitView after a short delay to ensure nodes are rendered
+    setTimeout(() => {
+      if (rfInstance) {
+        rfInstance.fitView();
+      }
+    }, 200);
+
+    setShowModal(false);
+  };
+
+  return (
+    <ReactFlowProvider>
+      <div className="p-4 space-y-4 h-screen w-full">
+        <div className="flex gap-2 mb-2">
+          <Button variant="primary" onClick={() => openConfigModal("prompt")}>Add Prompt</Button>
+          <Button variant="secondary" onClick={() => openConfigModal("key")}>Add Press-Key</Button>
+          <Button variant="success" onClick={() => openConfigModal("transfer")}>Add Transfer</Button>
+          <Button variant="danger" onClick={() => openConfigModal("hangup")}>Add Hangup</Button>
+        </div>
+        <div style={{ height: "80vh", width: "100%", border: "1px solid #ddd", borderRadius: 8 }}>
+          <ReactFlow
+            nodes={nodes}
+            edges={edges}
+            onNodesChange={onNodesChange}
+            onEdgesChange={onEdgesChange}
+            nodeTypes={nodeTypes}
+            onNodeClick={(_, node) => setSourceNode(node.id)}
+            onInit={setRfInstance}
+            fitView
+          >
+            <Background gap={20} color="#eee" />
+            <MiniMap zoomable pannable />
+            <Controls />
+          </ReactFlow>
+        </div>
+
+        <Modal show={showModal} onHide={() => setShowModal(false)}>
+          <Modal.Header closeButton>
+            <Modal.Title>Configure {selectedType.charAt(0).toUpperCase() + selectedType.slice(1)} Node</Modal.Title>
+          </Modal.Header>
+          <Modal.Body>
+            {selectedType === "prompt" && (
+              <Form.Group>
+                <Form.Label>Message</Form.Label>
+                <Form.Control
+                  type="text"
+                  value={formData.message || ""}
+                  onChange={(e) => setFormData({ ...formData, message: e.target.value })}
+                />
+              </Form.Group>
+            )}
+
+            {selectedType === "key" && (
+              <Form.Group>
+                <Form.Label>Options (e.g. 1:Sales,2:Support)</Form.Label>
+                <Form.Control
+                  type="text"
+                  value={formData.raw || ""}
+                  onChange={(e) => {
+                    const raw = e.target.value;
+                    const optionsArr = raw.split(",").map(pair => pair.split(":"));
+                    const options = Object.fromEntries(optionsArr);
+                    setFormData({ ...formData, options, raw });
+                  }}
+                />
+              </Form.Group>
+            )}
+
+            {selectedType === "transfer" && (
+              <Form.Group>
+                <Form.Label>Destination Extension</Form.Label>
+                <Form.Control
+                  type="text"
+                  value={formData.destination || ""}
+                  onChange={(e) => setFormData({ ...formData, destination: e.target.value })}
+                />
+              </Form.Group>
+            )}
+
+            {selectedType === "hangup" && (
+              <p className="text-sm text-muted">No configuration needed. This will end the call.</p>
+            )}
+          </Modal.Body>
+          <Modal.Footer>
+            <Button variant="outline-secondary" onClick={() => setShowModal(false)}>
+              Cancel
+            </Button>
+            <Button variant="primary" onClick={handleSaveNode}>Save</Button>
+          </Modal.Footer>
+        </Modal>
+      </div>
+    </ReactFlowProvider>
+  );
+};
+
+export default IVRBuilder;
+
