@@ -19,7 +19,7 @@ import Button from "react-bootstrap/Button";
 import Form from "react-bootstrap/Form";
 
 // Local mode fallback
-const API_BASE = "http://localhost:5000"; // set to null when API is not connected
+const API_BASE = "https://flow-builder-backend.onrender.com"; // set to null when API is not connected
 
 const nodeTypes = {
   ivrNode: ({ id, data }) => (
