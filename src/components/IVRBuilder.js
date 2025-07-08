@@ -1,4 +1,4 @@
-// IVRBuilder – All-in-One Flow Builder with SaaS, REST API, AGI Export, and Multi-User Templates
+// IVRBuilder – Multi-user Flow Builder
 import React, { useCallback, useState, useRef, useEffect } from "react";
 import ReactFlow, {
   addEdge,
@@ -18,8 +18,7 @@ import Modal from "react-bootstrap/Modal";
 import Button from "react-bootstrap/Button";
 import Form from "react-bootstrap/Form";
 
-// Local mode fallback
-const API_BASE = "https://flow-builder-backend.onrender.com"; // set to null when API is not connected
+const API_BASE = "http://localhost:5000"; // Backend URL
 
 const nodeTypes = {
   ivrNode: ({ id, data }) => (
@@ -30,27 +29,21 @@ const nodeTypes = {
       transition={{ duration: 0.3 }}
       style={{
         padding: 16,
-        background: id === data.simNodeId ? "#e0f7fa" : "#ffffff",
+        background: id === data.simNodeId ? "#e0f7fa" : "#fff",
         border: "2px solid #007bff",
         borderRadius: 16,
         width: 280,
         boxShadow: "0 6px 12px rgba(0,0,0,0.1)",
         fontFamily: "Inter, sans-serif",
-        position: "relative",
-        overflow: "hidden"
+        position: "relative"
       }}
     >
-      <Handle type="target" position={Position.Top} id="a" style={{ background: '#007bff' }} />
-      <div style={{ fontWeight: 700, fontSize: 14, marginBottom: 4, color: '#555' }}>{data.name}</div>
-      <div style={{ fontWeight: 700, fontSize: 16, marginBottom: 6, color: '#333' }}>{data.label}</div>
-      <div style={{ fontSize: 13, color: '#444', marginBottom: 8 }}>{data.summary || "(Double-click to configure)"}</div>
-      {data.audioUrl && (
-        <audio controls src={data.audioUrl} style={{ width: "100%", marginBottom: 8 }} />
-      )}
-      {data.conditions && (
-        <div style={{ fontSize: 11, color: '#999', fontStyle: 'italic' }}>{data.conditions}</div>
-      )}
-      <Handle type="source" position={Position.Bottom} id="b" style={{ background: '#007bff' }} />
+      <Handle type="target" position={Position.Top} style={{ background: '#007bff' }} />
+      <div style={{ fontWeight: 700, fontSize: 14 }}>{data.name}</div>
+      <div style={{ fontWeight: 600 }}>{data.label}</div>
+      <div style={{ fontSize: 12 }}>{data.summary || "(Double-click to configure)"}</div>
+      {data.audioUrl && <audio controls src={data.audioUrl} style={{ width: "100%" }} />}
+      <Handle type="source" position={Position.Bottom} style={{ background: '#007bff' }} />
       <button
         onClick={(e) => {
           e.stopPropagation();
@@ -59,90 +52,92 @@ const nodeTypes = {
         style={{
           position: 'absolute', top: 6, right: 6,
           background: '#ff6b6b', color: '#fff', border: 'none',
-          borderRadius: '50%', width: 24, height: 24,
-          fontSize: 14, cursor: 'pointer', lineHeight: '24px', textAlign: 'center'
+          borderRadius: '50%', width: 24, height: 24
         }}
-        title="Delete node"
+        title="Delete"
       >×</button>
     </motion.div>
   )
 };
 
-const IVRBuilder = () => {
+const IVRBuilder = ({ user }) => {
   const [nodes, setNodes, onNodesChange] = useNodesState([]);
   const [edges, setEdges, onEdgesChange] = useEdgesState([]);
   const [rfInstance, setRfInstance] = useState(null);
   const reactFlowWrapper = useRef(null);
   const [showModal, setShowModal] = useState(false);
   const [editingNode, setEditingNode] = useState(null);
-  const [configData, setConfigData] = useState({ name: '', summary: '', conditions: '', blockType: '', audioUrl: '', apiMock: '' });
-  const [simulationIndex, setSimulationIndex] = useState(null);
+  const [configData, setConfigData] = useState({});
   const [userFlows, setUserFlows] = useState([]);
+  const [selectedFlowId, setSelectedFlowId] = useState("");
 
+  // Load saved flows for current user
   const fetchFlows = async () => {
-    if (!API_BASE) return;
+    if (!user || !API_BASE) return;
     try {
-      const res = await import("axios").then(ax => ax.default.get(`${API_BASE}/flows`));
+      const axios = await import("axios").then(ax => ax.default);
+      const res = await axios.get(`${API_BASE}/flows?user=${user}`);
       setUserFlows(res.data);
     } catch (err) {
-      console.warn("Fetch error:", err.message);
+      console.error("Fetch error:", err.message);
     }
   };
 
+  // Save current flow
   const saveFlow = async () => {
     if (!API_BASE) {
-      console.log("Saved flow:", { nodes, edges });
-      alert("Flow mock-saved (no backend)");
+      alert("Flow saved locally (mock)");
       return;
     }
     try {
       const axios = await import("axios").then(ax => ax.default);
-      const payload = { name: "Untitled Flow", nodes, edges };
+      const payload = {
+        name: `Flow-${new Date().toISOString()}`,
+        username: user,
+        nodes, edges
+      };
       await axios.post(`${API_BASE}/flows`, payload);
-      alert("Flow saved!");
+      alert("Flow saved successfully!");
+      fetchFlows(); // Refresh list
     } catch (err) {
       console.warn("Save error:", err.message);
     }
   };
 
+  // Load selected flow
+  const loadFlow = (flow) => {
+    setNodes(flow.nodes || []);
+    setEdges(flow.edges || []);
+  };
+
+  // AGI Export
   const exportAGI = async () => {
-    if (!API_BASE) {
-      const script = `; AGI Script\n; Nodes: ${nodes.length}, Edges: ${edges.length}`;
-      const blob = new Blob([script], { type: 'text/plain' });
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = 'ivr-flow.agi';
-      a.click();
-      return;
-    }
     try {
       const axios = await import("axios").then(ax => ax.default);
-      const response = await axios.post(`${API_BASE}/export/agi`, { nodes, edges });
-      const blob = new Blob([response.data], { type: 'text/plain' });
+      const res = await axios.post(`${API_BASE}/export/agi`, { nodes, edges });
+      const blob = new Blob([res.data], { type: 'text/plain' });
       const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
+      const a = document.createElement("a");
       a.href = url;
-      a.download = 'ivr-flow.agi';
+      a.download = "ivr-flow.agi";
       a.click();
     } catch (err) {
-      console.warn("Export error:", err.message);
+      alert("Export failed");
     }
   };
 
-  const onDragStart = (event, type) => {
-    event.dataTransfer.setData("application/reactflow", type);
-    event.dataTransfer.effectAllowed = "move";
+  // Drag handlers
+  const onDragStart = (e, type) => {
+    e.dataTransfer.setData("application/reactflow", type);
+    e.dataTransfer.effectAllowed = "move";
   };
 
-  const onDrop = useCallback((event) => {
-    event.preventDefault();
+  const onDrop = useCallback((e) => {
     const bounds = reactFlowWrapper.current.getBoundingClientRect();
-    const type = event.dataTransfer.getData("application/reactflow");
-    if (!rfInstance) return;
+    const type = e.dataTransfer.getData("application/reactflow");
     const position = rfInstance.project({
-      x: event.clientX - bounds.left,
-      y: event.clientY - bounds.top
+      x: e.clientX - bounds.left,
+      y: e.clientY - bounds.top
     });
     const id = uuidv4();
     const newNode = {
@@ -151,18 +146,18 @@ const IVRBuilder = () => {
       position,
       data: {
         name: `${type}-${nodes.length + 1}`,
-        label: `${type.charAt(0).toUpperCase() + type.slice(1)} Node`,
+        label: `${type} Node`,
         blockType: type,
         onDelete: (id) => deleteNode(id),
         onConfigure: () => openModal(id),
       }
     };
-    setNodes((nds) => nds.concat(newNode));
+    setNodes(nds => [...nds, newNode]);
   }, [rfInstance, nodes]);
 
   const deleteNode = (id) => {
-    setNodes((nds) => nds.filter((n) => n.id !== id));
-    setEdges((eds) => eds.filter((e) => e.source !== id && e.target !== id));
+    setNodes((nds) => nds.filter(n => n.id !== id));
+    setEdges((eds) => eds.filter(e => e.source !== id && e.target !== id));
   };
 
   const openModal = (id) => {
@@ -170,64 +165,76 @@ const IVRBuilder = () => {
     if (node) {
       setEditingNode(id);
       setConfigData({
-        name: node.data.name || '',
-        summary: node.data.summary || '',
-        conditions: node.data.conditions || '',
-        blockType: node.data.blockType || '',
-        audioUrl: node.data.audioUrl || '',
-        apiMock: node.data.apiMock || ''
+        name: node.data.name || "",
+        summary: node.data.summary || "",
+        audioUrl: node.data.audioUrl || "",
+        conditions: node.data.conditions || "",
+        apiMock: node.data.apiMock || "",
+        blockType: node.data.blockType
       });
       setShowModal(true);
     }
   };
 
   const handleSaveConfig = () => {
-    setNodes(nds => nds.map(n =>
-      n.id === editingNode ? {
-        ...n,
-        data: {
-          ...n.data,
-          ...configData
-        }
-      } : n
-    ));
+    setNodes(nds => nds.map(n => n.id === editingNode ? { ...n, data: { ...n.data, ...configData } } : n));
     setShowModal(false);
   };
 
-  useEffect(() => { fetchFlows(); }, []);
-const handleImportJSON = (e) => {
-  const file = e.target.files[0];
-  if (file) {
+  const handleImportJSON = (e) => {
+    const file = e.target.files[0];
     const reader = new FileReader();
     reader.onload = () => {
       try {
-        const data = JSON.parse(reader.result);
-        setNodes(data.nodes || []);
-        setEdges(data.edges || []);
-      } catch (err) {
-        alert("Invalid JSON file.");
+        const json = JSON.parse(reader.result);
+        setNodes(json.nodes || []);
+        setEdges(json.edges || []);
+      } catch {
+        alert("Invalid JSON");
       }
     };
     reader.readAsText(file);
-  }
-};
+  };
+
+  useEffect(() => {
+    fetchFlows();
+  }, [user]);
+
   return (
     <ReactFlowProvider>
       <div style={{ display: "flex", height: "100vh" }}>
-        <aside style={{ width: 260, padding: 16, background: "#f8f9fb", borderRight: "1px solid #e0e0e0" }}>
+        <aside style={{ width: 260, padding: 16, background: "#f4f6fa", borderRight: "1px solid #ddd" }}>
           <h4>IVR Blocks</h4>
-          {["prompt", "key", "transfer", "hangup", "api", "record", "language", "menu", "queue", "voicemail"].map(type => (
-            <div key={type} onDragStart={(e) => onDragStart(e, type)} draggable style={{ padding: 10, marginBottom: 10, border: "1px solid #cfe2ff", borderRadius: 8, background: "#fff" }}>{type}</div>
+          {["prompt", "key", "transfer", "hangup", "api", "record", "language"].map(type => (
+            <div key={type} draggable onDragStart={(e) => onDragStart(e, type)}
+              style={{ margin: "8px 0", padding: 8, border: "1px solid #ccc", borderRadius: 6, background: "#fff", cursor: "grab" }}>
+              {type}
+            </div>
           ))}
           <hr />
-          <Button size="sm" onClick={saveFlow}>💾 Save</Button>{' '}
-          <input type="file" accept=".json" onChange={handleImportJSON} />
+          <Button size="sm" onClick={saveFlow}>💾 Save Flow</Button>
+          <Button size="sm" className="mt-2" onClick={exportAGI}>📜 Export AGI</Button>
+          <input className="mt-2" type="file" accept=".json" onChange={handleImportJSON} />
 
-          <Button size="sm" onClick={exportAGI}>📜 Export AGI</Button>
+          {userFlows.length > 0 && (
+            <>
+              <hr />
+              <Form.Select size="sm" value={selectedFlowId} onChange={(e) => {
+                const flow = userFlows.find(f => f._id === e.target.value);
+                setSelectedFlowId(e.target.value);
+                if (flow) loadFlow(flow);
+              }}>
+                <option>Load your flows</option>
+                {userFlows.map(f => (
+                  <option key={f._id} value={f._id}>{f.name}</option>
+                ))}
+              </Form.Select>
+            </>
+          )}
         </aside>
-        <div ref={reactFlowWrapper} style={{ flexGrow: 1 }}>
+        <div ref={reactFlowWrapper} style={{ flex: 1 }}>
           <ReactFlow
-            nodes={nodes.map(n => ({ ...n, data: { ...n.data, onDelete: deleteNode, onConfigure: () => openModal(n.id), simNodeId: simulationIndex } }))}
+            nodes={nodes.map(n => ({ ...n, data: { ...n.data, onDelete: deleteNode, onConfigure: () => openModal(n.id) } }))}
             edges={edges}
             onNodesChange={onNodesChange}
             onEdgesChange={onEdgesChange}
@@ -235,46 +242,25 @@ const handleImportJSON = (e) => {
             onInit={setRfInstance}
             nodeTypes={nodeTypes}
             onDrop={onDrop}
-            onDragOver={(event) => event.preventDefault()}
-            onEdgeClick={(event, edge) => {
-              event.stopPropagation();
-              setEdges((eds) => eds.filter((e) => e.id !== edge.id));
-            }}
+            onDragOver={(e) => e.preventDefault()}
             onNodeDoubleClick={(_, node) => openModal(node.id)}
             fitView
           >
-            <Background gap={20} color="#f0f0f0" />
-            <MiniMap nodeColor={() => '#007bff'} nodeStrokeWidth={2} />
-            <Controls showInteractive={true} />
+            <Background />
+            <MiniMap nodeColor={() => "#007bff"} />
+            <Controls />
           </ReactFlow>
         </div>
 
         <Modal show={showModal} onHide={() => setShowModal(false)}>
-          <Modal.Header closeButton>
-            <Modal.Title>Configure Node</Modal.Title>
-          </Modal.Header>
+          <Modal.Header closeButton><Modal.Title>Configure Node</Modal.Title></Modal.Header>
           <Modal.Body>
-            <Form.Group>
-              <Form.Label>Node Name</Form.Label>
-              <Form.Control type="text" value={configData.name} onChange={(e) => setConfigData({ ...configData, name: e.target.value })} />
-            </Form.Group>
-            <Form.Group className="mt-2">
-              <Form.Label>Details / Summary</Form.Label>
-              <Form.Control as="textarea" rows={3} value={configData.summary} onChange={(e) => setConfigData({ ...configData, summary: e.target.value })} />
-            </Form.Group>
-            <Form.Group className="mt-2">
-              <Form.Label>Audio File URL (optional)</Form.Label>
-              <Form.Control type="text" value={configData.audioUrl} onChange={(e) => setConfigData({ ...configData, audioUrl: e.target.value })} />
-            </Form.Group>
-            <Form.Group className="mt-2">
-              <Form.Label>Conditional Routing</Form.Label>
-              <Form.Control as="textarea" rows={3} value={configData.conditions} onChange={(e) => setConfigData({ ...configData, conditions: e.target.value })} />
-            </Form.Group>
-            {configData.blockType === 'api' && (
-              <Form.Group className="mt-2">
-                <Form.Label>Mock API Response</Form.Label>
-                <Form.Control as="textarea" rows={2} value={configData.apiMock} onChange={(e) => setConfigData({ ...configData, apiMock: e.target.value })} />
-              </Form.Group>
+            <Form.Group><Form.Label>Name</Form.Label><Form.Control value={configData.name} onChange={(e) => setConfigData({ ...configData, name: e.target.value })} /></Form.Group>
+            <Form.Group className="mt-2"><Form.Label>Summary</Form.Label><Form.Control as="textarea" value={configData.summary} onChange={(e) => setConfigData({ ...configData, summary: e.target.value })} /></Form.Group>
+            <Form.Group className="mt-2"><Form.Label>Audio URL</Form.Label><Form.Control value={configData.audioUrl} onChange={(e) => setConfigData({ ...configData, audioUrl: e.target.value })} /></Form.Group>
+            <Form.Group className="mt-2"><Form.Label>Conditions</Form.Label><Form.Control as="textarea" value={configData.conditions} onChange={(e) => setConfigData({ ...configData, conditions: e.target.value })} /></Form.Group>
+            {configData.blockType === "api" && (
+              <Form.Group className="mt-2"><Form.Label>Mock API</Form.Label><Form.Control as="textarea" value={configData.apiMock} onChange={(e) => setConfigData({ ...configData, apiMock: e.target.value })} /></Form.Group>
             )}
           </Modal.Body>
           <Modal.Footer>
@@ -288,3 +274,4 @@ const handleImportJSON = (e) => {
 };
 
 export default IVRBuilder;
+
