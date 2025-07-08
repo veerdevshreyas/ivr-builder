@@ -3,7 +3,7 @@ import React, { useState, useEffect } from 'react';
 import IVRBuilder from './components/IVRBuilder';
 import axios from 'axios';
 
-const API_BASE = 'http://localhost:5000';
+const API_BASE = 'https://flow-builder-backend.onrender.com';
 
 function App() {
   const [user, setUser] = useState(() => JSON.parse(localStorage.getItem("ivrUser")) || null);
