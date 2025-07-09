@@ -1,9 +1,9 @@
-// App.js
-import React, { useState, useEffect } from 'react';
-import IVRBuilder from './components/IVRBuilder';
-import axios from 'axios';
+import React, { useState, useEffect } from "react";
+import IVRBuilder from "./components/IVRBuilder";
+import axios from "axios";
+import "./App.css";
 
-const API_BASE = 'https://flow-builder-backend.onrender.com';
+const API_BASE = "http://localhost:5000"; // or your backend URL
 
 function App() {
   const [user, setUser] = useState(() => JSON.parse(localStorage.getItem("ivrUser")) || null);
@@ -15,23 +15,22 @@ function App() {
     try {
       const res = await axios.post(`${API_BASE}/auth/login`, form);
       localStorage.setItem("ivrUser", JSON.stringify(res.data));
-      axios.defaults.headers.common['Authorization'] = `Bearer ${res.data.token}`;
+      axios.defaults.headers.common["Authorization"] = `Bearer ${res.data.token}`;
       setUser(res.data);
       setError("");
-    } catch (err) {
-      setError("Invalid credentials or server error.");
+    } catch {
+      setError("Invalid credentials.");
     }
   };
 
   const handleRegister = async () => {
     try {
-      const res = await axios.post(`${API_BASE}/auth/register`, form);
+      await axios.post(`${API_BASE}/auth/register`, form);
       alert("User registered successfully");
       setIsRegisterMode(false);
       setForm({ username: "", password: "" });
-      setError("");
-    } catch (err) {
-      setError("User already exists or server error.");
+    } catch {
+      setError("User already exists.");
     }
   };
 
@@ -42,53 +41,43 @@ function App() {
 
   useEffect(() => {
     if (user?.token) {
-      axios.defaults.headers.common['Authorization'] = `Bearer ${user.token}`;
+      axios.defaults.headers.common["Authorization"] = `Bearer ${user.token}`;
     }
   }, [user]);
 
   return (
-    <div>
+    <div className="app-wrapper">
       {!user ? (
-        <div style={{ padding: 40, textAlign: "center" }}>
-          <h2>{isRegisterMode ? "Register" : "Login"} to IVR Flow Builder</h2>
+        <div className="auth-box">
+          <h2>{isRegisterMode ? "Register" : "Login"} to Flow Builder</h2>
           <input
             type="text"
             placeholder="Username"
             value={form.username}
             onChange={(e) => setForm({ ...form, username: e.target.value })}
-            style={{ padding: 10, fontSize: 16, margin: 6 }}
           />
-          <br />
           <input
             type="password"
             placeholder="Password"
             value={form.password}
             onChange={(e) => setForm({ ...form, password: e.target.value })}
-            style={{ padding: 10, fontSize: 16, margin: 6 }}
           />
-          <br />
-          {error && <p style={{ color: "red" }}>{error}</p>}
-          <button
-            onClick={isRegisterMode ? handleRegister : handleLogin}
-            style={{ padding: "10px 20px", margin: 10 }}
-          >
+          {error && <p className="error">{error}</p>}
+          <button onClick={isRegisterMode ? handleRegister : handleLogin}>
             {isRegisterMode ? "Register" : "Login"}
           </button>
           <p>
-            {isRegisterMode ? "Already have an account?" : "Don't have an account?"}
-            <button
-              style={{ marginLeft: 10 }}
-              onClick={() => setIsRegisterMode(!isRegisterMode)}
-            >
-              {isRegisterMode ? "Login" : "Register"}
-            </button>
+            {isRegisterMode ? "Already have an account?" : "No account yet?"}
+            <span onClick={() => setIsRegisterMode(!isRegisterMode)}>
+              {isRegisterMode ? " Login" : " Register"}
+            </span>
           </p>
         </div>
       ) : (
         <>
-          <div style={{ padding: 8, background: "#f0f0f0", textAlign: "right" }}>
-            Logged in as <strong>{user.username}</strong> ({user.role})
-            <button onClick={handleLogout} style={{ marginLeft: 12, padding: "6px 12px" }}>Logout</button>
+          <div className="topbar">
+            Logged in as <strong>{user.username}</strong>
+            <button onClick={handleLogout}>Logout</button>
           </div>
           <IVRBuilder user={user} />
         </>
@@ -98,4 +87,3 @@ function App() {
 }
 
 export default App;
-

@@ -28,6 +28,80 @@
   color: #61dafb;
 }
 
+.app-wrapper {
+  font-family: 'Inter', sans-serif;
+  height: 100vh;
+  background: #f9f9fb;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+
+.auth-box {
+  background: white;
+  padding: 32px;
+  border-radius: 12px;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
+  text-align: center;
+  width: 320px;
+}
+
+.auth-box input {
+  display: block;
+  width: 100%;
+  padding: 12px;
+  margin: 12px 0;
+  border: 1px solid #ddd;
+  border-radius: 8px;
+  font-size: 16px;
+}
+
+.auth-box button {
+  width: 100%;
+  padding: 12px;
+  margin-top: 12px;
+  font-size: 16px;
+  background: #007bff;
+  color: white;
+  border: none;
+  border-radius: 8px;
+  cursor: pointer;
+}
+
+.auth-box .error {
+  color: red;
+  margin-bottom: 8px;
+}
+
+.auth-box p {
+  margin-top: 16px;
+}
+
+.auth-box span {
+  color: #007bff;
+  cursor: pointer;
+  font-weight: bold;
+}
+
+.topbar {
+  padding: 12px;
+  background: #eef1f4;
+  text-align: right;
+  font-size: 14px;
+  border-bottom: 1px solid #ccc;
+}
+
+.topbar button {
+  margin-left: 16px;
+  padding: 6px 12px;
+  border: none;
+  background: #e53935;
+  color: white;
+  border-radius: 6px;
+  cursor: pointer;
+}
+
+
 @keyframes App-logo-spin {
   from {
     transform: rotate(0deg);
